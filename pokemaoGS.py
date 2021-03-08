@@ -37,8 +37,8 @@ def pad_images_to_same_size(images):
         pad_left = diff_hori//2
         pad_right = diff_hori - pad_left
         #img_padded = cv2.copyMakeBorder(img, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=[255,255,255])
-        img_padded = cv2.resize(img,(width_max, height_max))
-        assert img_padded.shape[:2] == (height_max, width_max)
+        img_padded = cv2.resize(img,(64, 64))
+        # assert img_padded.shape[:2] == (height_max, width_max)
         img_padded = cv2.cvtColor(img_padded, cv2.COLOR_BGR2GRAY)
         images_padded.append(img_padded)
     return images_padded
@@ -59,7 +59,7 @@ plt.show()
 pokemao = pad_images_to_same_size(pokemao)
 
 train_images = np.asarray(pokemao)
-train_images = train_images.reshape(train_images.shape[0], 56, 56, 1).astype('float16')
+train_images = train_images.reshape(train_images.shape[0], 64, 64, 1).astype('float16')
 train_images = (train_images - 127.5) / 127.5 # Normalize the images to [-1, 1]
 
 BUFFER_SIZE = 64
@@ -71,42 +71,45 @@ train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_
 
 def make_generator_model():
     model = tf.keras.Sequential()
-    model.add(layers.Dense(14*14*256, use_bias=False, input_shape=(512,)))
+    model.add(layers.Dense(4*4*256, use_bias=False, input_shape=(512,)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
-    model.add(layers.Reshape((14, 14, 256)))
-    assert model.output_shape == (None, 14, 14, 256) # Note: None is the batch size
+    model.add(layers.Reshape((4, 4, 256)))
+    assert model.output_shape == (None, 4, 4, 256) # Note: None is the batch size
 
-    model.add(layers.UpSampling2D())
-    model.add(layers.Conv2D(128,(5,5), strides = (1,1)))
+    #model.add(layers.UpSampling2D())
+    #model.add(layers.Conv2D(128,(5,5), strides = (1,1)))
 
-    #model.add(layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
+    model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 24, 24, 128)
+    assert model.output_shape == (None, 8, 8, 128)
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
-    model.add(layers.UpSampling2D(size = (3,3)))
-    model.add(layers.Conv2D(64, (5, 5), strides=(1, 1)))
-    #model.add(layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
+    #model.add(layers.UpSampling2D(size = (3,3)))
+    #model.add(layers.Conv2D(64, (5, 5), strides=(1, 1)))
+    model.add(layers.Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 68, 68, 64)
+    assert model.output_shape == (None, 16, 16, 64)
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
-
-    model.add(layers.UpSampling2D())
-    model.add(layers.Conv2D(1, (4, 4), strides=(2, 2)))
-    #model.add(layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
-    model.add(layers.Cropping2D(((6,5),(6,5))))
+    model.add(layers.Conv2DTranspose(32, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+    #model.add(layers.UpSampling2D())
+    #model.add(layers.Conv2D(1, (4, 4), strides=(2, 2)))
+    model.add(layers.Conv2DTranspose(1, (4, 4), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
+    #model.add(layers.Cropping2D(((6,5),(6,5))))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 56, 56, 1)
+    assert model.output_shape == (None, 64, 64, 1)
 
     return model
 
@@ -114,7 +117,7 @@ def make_generator_model():
 def make_discriminator_model():
     model = tf.keras.Sequential()
     model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[56, 56, 1]))
+                                     input_shape=[64, 64, 1]))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
