@@ -52,7 +52,7 @@ def load_images_from_folder(folder):
             images.append(img)
     return images
 
-pokemao = load_images_from_folder("genwunner")
+pokemao = load_images_from_folder("gen1")
 plt.imshow(pokemao[149])
 plt.show()
 
