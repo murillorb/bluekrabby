@@ -2,6 +2,7 @@
 # e de https://stackoverflow.com/questions/30230592/loading-all-images-using-imread-from-a-given-folder/30230738
 # e de https://stackoverflow.com/questions/43391205/add-padding-to-images-to-get-them-into-the-same-shape
 # fonte das imagens: https://veekun.com/dex/downloads
+# com dicas de https://github.com/eriklindernoren/Keras-GAN/blob/master/wgan/wgan.py
 import tensorflow as tf
 import glob
 import imageio
@@ -13,6 +14,8 @@ from tensorflow.keras import layers
 import time
 import cv2
 from IPython import display
+from keras import backend as K
+
 
 
 def pad_images_to_same_size(images):
@@ -39,8 +42,10 @@ def pad_images_to_same_size(images):
         #img_padded = cv2.copyMakeBorder(img, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=[255,255,255])
         img_padded = cv2.resize(img,(64, 64))
         # assert img_padded.shape[:2] == (height_max, width_max)
-        img_padded = cv2.cvtColor(img_padded, cv2.COLOR_BGR2GRAY)
+        img_padded = cv2.cvtColor(img_padded, cv2.COLOR_BGR2RGB)
         images_padded.append(img_padded)
+    plt.imshow(images_padded[10])
+    plt.show()
     return images_padded
 
 
@@ -52,64 +57,128 @@ def load_images_from_folder(folder):
             images.append(img)
     return images
 
-pokemao = load_images_from_folder("gen1")
-plt.imshow(pokemao[149])
-plt.show()
+pokemao = load_images_from_folder("pikashort")
+
 
 pokemao = pad_images_to_same_size(pokemao)
 
 train_images = np.asarray(pokemao)
-train_images = train_images.reshape(train_images.shape[0], 64, 64, 1).astype('float16')
+train_images = train_images.reshape(train_images.shape[0], 64, 64, 3).astype('float16')
 train_images = (train_images - 127.5) / 127.5 # Normalize the images to [-1, 1]
 
-BUFFER_SIZE = 64
-BATCH_SIZE = 32
+BUFFER_SIZE = 16
+BATCH_SIZE = 16
 
 # Batch and shuffle the data
 train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
 
-def make_generator_model():
+def make_generator_modelus():
     model = tf.keras.Sequential()
-    model.add(layers.Dense(4*4*256, use_bias=False, input_shape=(512,)))
+    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(100,)))
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
+
+    model.add(layers.Reshape((4, 4, 256*3)))
+    assert model.output_shape == (None, 4, 4, 256*3) # Note: None is the batch size
+
+    model.add(layers.UpSampling2D(interpolation='bilinear'))
+    model.add(layers.ZeroPadding2D((1, 1)))
+
+    model.add(layers.Conv2D(128*3,(2,2), strides = (1,1)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
-
-    model.add(layers.Reshape((4, 4, 256)))
-    assert model.output_shape == (None, 4, 4, 256) # Note: None is the batch size
-
-    #model.add(layers.UpSampling2D())
-    #model.add(layers.Conv2D(128,(5,5), strides = (1,1)))
-
-    model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    #model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 8, 8, 128)
+    #assert model.output_shape == (None, 8, 8, 128)
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
+    model.add(layers.UpSampling2D(interpolation='bilinear'))
+    model.add(layers.ZeroPadding2D((1, 1)))
+
+    model.add(layers.Conv2D(64*3, (2, 2), strides=(1, 1)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
 
     #model.add(layers.UpSampling2D(size = (3,3)))
     #model.add(layers.Conv2D(64, (5, 5), strides=(1, 1)))
-    model.add(layers.Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    #model.add(layers.Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same', use_bias=False))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 16, 16, 64)
+    #assert model.output_shape == (None, 16, 16, 64)
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
+    model.add(layers.UpSampling2D(interpolation='bilinear'))
+    model.add(layers.ZeroPadding2D((1, 1)))
+    model.add(layers.Conv2D(32*3, (2, 2), strides=(1, 1)))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
-    model.add(layers.Conv2DTranspose(32, (4, 4), strides=(2, 2), padding='same', use_bias=False))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
+
+    #model.add(layers.Conv2DTranspose(32, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
     #model.add(layers.UpSampling2D())
     #model.add(layers.Conv2D(1, (4, 4), strides=(2, 2)))
-    model.add(layers.Conv2DTranspose(1, (4, 4), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
+    model.add(layers.UpSampling2D(interpolation='bilinear'))
+    model.add(layers.Conv2D(16*3, kernel_size=4, padding="same"))
+    model.add(layers.BatchNormalization(momentum=0.8))
+    model.add(layers.LeakyReLU())
+    model.add(layers.ZeroPadding2D((1, 1)))
+    model.add(layers.Conv2D(3, (2, 2), strides=(1, 1), activation='tanh'))
+    #model.add(layers.Conv2DTranspose(3, (4, 4), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
+    model.add(layers.Cropping2D(((8,7),(8,7))))
+    print(model.output_shape)
+    assert model.output_shape == (None, 64, 64, 3)
+
+    return model
+
+
+def make_generator_model():
+    model = tf.keras.Sequential()
+    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(100,)))
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
+
+    model.add(layers.Reshape((4, 4, 256*3)))
+    #assert model.output_shape == (None, 4, 4, 256) # Note: None is the batch size
+
+    model.add(layers.Conv2DTranspose(128*3, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    print(model.output_shape)
+
+    #assert model.output_shape == (None, 8, 8, 128)
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+
+    #model.add(layers.UpSampling2D(size = (3,3)))
+    #model.add(layers.Conv2D(64, (5, 5), strides=(1, 1)))
+    model.add(layers.Conv2DTranspose(64*3, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+    print(model.output_shape)
+
+    #assert model.output_shape == (None, 16, 16, 64)
+    #model.add(layers.BatchNormalization())
+    #model.add(layers.LeakyReLU())
+    #model.add(layers.Dropout(0.3))
+    model.add(layers.Conv2DTranspose(32*3, (4, 4), strides=(2, 2), padding='same', use_bias=False))
+    model.add(layers.BatchNormalization())
+    model.add(layers.LeakyReLU())
+    model.add(layers.Dropout(0.3))
+
+    model.add(layers.Conv2DTranspose(3, (4, 4), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
     #model.add(layers.Cropping2D(((6,5),(6,5))))
     print(model.output_shape)
 
-    assert model.output_shape == (None, 64, 64, 1)
+    assert model.output_shape == (None, 64, 64, 3)
 
     return model
 
@@ -117,7 +186,7 @@ def make_generator_model():
 def make_discriminator_model():
     model = tf.keras.Sequential()
     model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[64, 64, 1]))
+                                     input_shape=[64, 64, 3]))
     model.add(layers.LeakyReLU())
     model.add(layers.Dropout(0.3))
 
@@ -130,7 +199,11 @@ def make_discriminator_model():
     model.add(layers.Dropout(0.3))
 
     model.add(layers.Flatten())
+    model.add(layers.Dense(1024))
+    model.add(layers.LeakyReLU())
     model.add(layers.Dense(1))
+
+
 
     return model
 
@@ -140,17 +213,30 @@ discriminator = make_discriminator_model()
 
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 
-def discriminator_loss(real_output, fake_output):
+
+def discriminator_loss(real_img, fake_img):
+    real_loss = tf.reduce_mean(real_img)
+    fake_loss = tf.reduce_mean(fake_img)
+    return fake_loss - real_loss
+
+
+# Define the loss functions for the generator.
+def generator_loss(fake_img):
+    return -tf.reduce_mean(fake_img)
+
+
+def odiscriminator_loss(real_output, fake_output):
     real_loss = cross_entropy(tf.ones_like(real_output)*0.9, real_output)
     fake_loss = cross_entropy(tf.zeros_like(fake_output), fake_output)
     total_loss = real_loss + fake_loss
     return total_loss
 
-def generator_loss(fake_output):
+def ogenerator_loss(fake_output):
     return cross_entropy(tf.ones_like(fake_output), fake_output)
 
-generator_optimizer = tf.keras.optimizers.Adam(2e-4)
-discriminator_optimizer = tf.keras.optimizers.Adam(2e-4)
+
+generator_optimizer = tf.keras.optimizers.RMSprop(lr=0.00005)
+discriminator_optimizer = tf.keras.optimizers.RMSprop(lr=0.00005)
 
 checkpoint_dir = './training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
@@ -160,7 +246,7 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator=discriminator)
 
 EPOCHS = 100000
-noise_dim = 512
+noise_dim = 100
 num_examples_to_generate = 16
 
 # We will reuse this seed overtime (so it's easier)
@@ -188,12 +274,21 @@ def train_step(images):
     generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
     discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
 
+#clip_value = 0.01
+
 def train(dataset, epochs):
+  clip_value = 0.05
   for epoch in range(epochs):
     start = time.time()
+    for n in range(5):
+        for image_batch in dataset:
+          train_step(image_batch)
 
-    for image_batch in dataset:
-      train_step(image_batch)
+        #clip weights
+        for l in discriminator.layers:
+            weights = l.get_weights()
+            weights = [np.clip(w, -clip_value, clip_value) for w in weights]
+            l.set_weights(weights)
 
     # Produce images for the GIF as we go
     if epoch % 50 == 0:
@@ -219,13 +314,13 @@ def generate_and_save_images(model, epoch, test_input):
   # This is so all layers run in inference mode (batchnorm).
   predictions = model(test_input, training=False)
 
-  fig = plt.figure(figsize=(4,4))
+  fig = plt.figure(figsize=(16,16))
 
   for i in range(predictions.shape[0]):
       plt.subplot(4, 4, i+1)
 
       plott = predictions[i, :, :, :] * 127.5 + 127.5
-      plott = cv2.cvtColor(np.uint8(plott), cv2.COLOR_BGR2RGB)
+      #plott = cv2.cvtColor(np.uint8(plott), cv2.COLOR_BGR2RGB)
 
       #print(str(np.shape(plott)))
       plt.imshow(np.uint8(plott))
@@ -235,7 +330,6 @@ def generate_and_save_images(model, epoch, test_input):
   #plt.show()
 
 train(train_dataset, EPOCHS)
-
 
 
 
