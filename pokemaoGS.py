@@ -44,6 +44,7 @@ def pad_images_to_same_size(images):
         # assert img_padded.shape[:2] == (height_max, width_max)
         img_padded = cv2.cvtColor(img_padded, cv2.COLOR_BGR2RGB)
         images_padded.append(img_padded)
+        images_padded.append(cv2.flip(img_padded,1))
     plt.imshow(images_padded[10])
     plt.show()
     return images_padded
@@ -57,7 +58,7 @@ def load_images_from_folder(folder):
             images.append(img)
     return images
 
-pokemao = load_images_from_folder("pikashort")
+pokemao = load_images_from_folder("pikaplain")
 
 
 pokemao = pad_images_to_same_size(pokemao)
@@ -66,16 +67,16 @@ train_images = np.asarray(pokemao)
 train_images = train_images.reshape(train_images.shape[0], 64, 64, 3).astype('float16')
 train_images = (train_images - 127.5) / 127.5 # Normalize the images to [-1, 1]
 
-BUFFER_SIZE = 16
+BUFFER_SIZE = 32
 BATCH_SIZE = 16
 
 # Batch and shuffle the data
 train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
 
-def make_generator_modelus():
+def make_generator_model():
     model = tf.keras.Sequential()
-    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(100,)))
+    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(256,)))
     #model.add(layers.BatchNormalization())
     #model.add(layers.LeakyReLU())
     #model.add(layers.Dropout(0.3))
@@ -83,64 +84,39 @@ def make_generator_modelus():
     model.add(layers.Reshape((4, 4, 256*3)))
     assert model.output_shape == (None, 4, 4, 256*3) # Note: None is the batch size
 
-    model.add(layers.UpSampling2D(interpolation='bilinear'))
-    model.add(layers.ZeroPadding2D((1, 1)))
-
-    model.add(layers.Conv2D(128*3,(2,2), strides = (1,1)))
+    #model.add(layers.UpSampling2D(interpolation='bilinear'))
+    model.add(layers.Conv2D(128*3,(2,2), strides = (1,1), padding = "same"))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-    #model.add(layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding='same', use_bias=False))
-    print(model.output_shape)
-
-    #assert model.output_shape == (None, 8, 8, 128)
-    #model.add(layers.BatchNormalization())
-    #model.add(layers.LeakyReLU())
-    #model.add(layers.Dropout(0.3))
-    model.add(layers.UpSampling2D(interpolation='bilinear'))
-    model.add(layers.ZeroPadding2D((1, 1)))
-
-    model.add(layers.Conv2D(64*3, (2, 2), strides=(1, 1)))
+    model.add(layers.UpSampling2D(interpolation='nearest'))
+    model.add(layers.Conv2D(64*3, (2, 2), strides=(1, 1), padding = "same"))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-
-    #model.add(layers.UpSampling2D(size = (3,3)))
-    #model.add(layers.Conv2D(64, (5, 5), strides=(1, 1)))
-    #model.add(layers.Conv2DTranspose(64, (4, 4), strides=(2, 2), padding='same', use_bias=False))
-    print(model.output_shape)
-
-    #assert model.output_shape == (None, 16, 16, 64)
-    #model.add(layers.BatchNormalization())
-    #model.add(layers.LeakyReLU())
-    #model.add(layers.Dropout(0.3))
-    model.add(layers.UpSampling2D(interpolation='bilinear'))
-    model.add(layers.ZeroPadding2D((1, 1)))
-    model.add(layers.Conv2D(32*3, (2, 2), strides=(1, 1)))
+    model.add(layers.UpSampling2D(interpolation='nearest'))
+    model.add(layers.Conv2D(32*3, (2, 2), strides=(1, 1), padding = "same"))
     model.add(layers.BatchNormalization())
     model.add(layers.LeakyReLU())
-
-    #model.add(layers.Conv2DTranspose(32, (4, 4), strides=(2, 2), padding='same', use_bias=False))
-    #model.add(layers.BatchNormalization())
-    #model.add(layers.LeakyReLU())
-    #model.add(layers.Dropout(0.3))
-    #model.add(layers.UpSampling2D())
-    #model.add(layers.Conv2D(1, (4, 4), strides=(2, 2)))
-    model.add(layers.UpSampling2D(interpolation='bilinear'))
-    model.add(layers.Conv2D(16*3, kernel_size=4, padding="same"))
+    model.add(layers.UpSampling2D(interpolation='nearest'))
+    model.add(layers.Conv2D(16*3, (2, 2), strides=(1, 1), padding = "same"))
     model.add(layers.BatchNormalization(momentum=0.8))
     model.add(layers.LeakyReLU())
-    model.add(layers.ZeroPadding2D((1, 1)))
-    model.add(layers.Conv2D(3, (2, 2), strides=(1, 1), activation='tanh'))
-    #model.add(layers.Conv2DTranspose(3, (4, 4), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
-    model.add(layers.Cropping2D(((8,7),(8,7))))
+    model.add(layers.UpSampling2D(interpolation='nearest'))
+    model.add(layers.Conv2D(8 * 3, (2, 2), strides=(1, 1), padding="same"))
+    model.add(layers.BatchNormalization(momentum=0.8))
+    model.add(layers.LeakyReLU())
+    model.add(layers.Conv2D(3, (2, 2), strides=(1, 1), padding = "same", activation='tanh'))
+    #model.add(layers.Cropping2D(((8,7),(8,7))))
     print(model.output_shape)
     assert model.output_shape == (None, 64, 64, 3)
 
     return model
 
 
-def make_generator_model():
+
+
+def make_generator_modelS():
     model = tf.keras.Sequential()
-    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(100,)))
+    model.add(layers.Dense(4*4*256*3, use_bias=False, input_shape=(256,)))
     #model.add(layers.BatchNormalization())
     #model.add(layers.LeakyReLU())
     #model.add(layers.Dropout(0.3))
@@ -246,7 +222,7 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator=discriminator)
 
 EPOCHS = 100000
-noise_dim = 100
+noise_dim = 256
 num_examples_to_generate = 16
 
 # We will reuse this seed overtime (so it's easier)
